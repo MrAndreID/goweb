@@ -1,0 +1,14 @@
+{{ define "base" }}<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ block "title" . }}{{ .Title }}{{ end }} - GoWeb</title>
+    <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+    {{ block "content" . }}{{ end }}
+    <p class="muted" style="margin-top:2rem;">GoWeb - frontend server-side rendered yang terhubung ke backend API.</p>
+</body>
+</html>
+{{ end }}

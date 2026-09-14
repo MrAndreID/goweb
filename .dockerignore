@@ -1,0 +1,51 @@
+# Everything listed here is excluded from the build context, so it never
+# reaches the Docker daemon and can never end up in an image layer.
+
+# The image builds only ./cmd/web (see Dockerfile).
+#
+# Version control metadata. Keeping .git out also means `go build` has no VCS to
+# stamp, which is why the builder stage passes -buildvcs=false.
+.git
+.gitattributes
+.gitignore
+.github
+.gitlab-ci.yml
+
+# OS and editor noise
+.DS_Store
+**/.DS_Store
+Thumbs.db
+.idea
+.vscode
+.kiro
+
+# Local build output and test artifacts
+engine
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.log
+
+# Runtime data. The runtime stage creates its own empty /app/storage.
+storage
+
+# Container and project docs
+Dockerfile*
+.dockerignore
+docker-compose*.yml
+compose*.yml
+README.md
+LICENSE
+
+# Tests are not needed to compile the binary
+**/*_test.go
+
+# Real environment files. Only .env.example is needed, and the runtime stage
+# bakes it as /app/.env. Mount the real file at runtime
+# (-v /path/to/.env:/app/.env:ro) so secrets never reach the Docker daemon.
+.env
+.env.test

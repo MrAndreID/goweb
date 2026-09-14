@@ -1,0 +1,45 @@
+{{ define "content" }}
+<h1>Users</h1>
+<p class="muted">Daftar user yang diambil dari backend API.</p>
+
+{{ if .Error }}<div class="alert error">{{ .Error }}</div>{{ end }}
+{{ if .Success }}<div class="alert success">{{ .Success }}</div>{{ end }}
+
+<div class="actions">
+    <a class="btn" href="/users/create">+ Create User</a>
+    <a class="btn secondary" href="/users">Refresh</a>
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Emails</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{ range .Users }}
+        <tr>
+            <td>{{ .Name }}</td>
+            <td>
+                {{ range .Emails }}<div>{{ .Email }}</div>{{ end }}
+            </td>
+            <td>
+                <a class="btn secondary" href="/users/{{ .ID }}/edit">Edit</a>
+                <form class="inline" method="post" action="/users/{{ .ID }}/delete" onsubmit="return confirm('Delete this user?');">
+                    <button class="btn danger" type="submit">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {{ else }}
+        <tr><td colspan="3" class="muted">No users found.</td></tr>
+        {{ end }}
+    </tbody>
+</table>
+
+<p class="muted">
+    Page {{ .Paginator.Page }} &middot; Limit {{ .Paginator.Limit }}
+    {{ if .Paginator.Total }}&middot; Total {{ .Paginator.Total }}{{ end }}
+</p>
+{{ end }}
