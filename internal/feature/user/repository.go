@@ -13,7 +13,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Error domain yang bisa dikenali lapisan atas tanpa perlu tahu detail HTTP.
 var (
 	ErrNotFound       = errors.New("user not found")
 	ErrDuplicateEmail = errors.New("duplicate email")
@@ -22,9 +21,6 @@ var (
 	ErrBackend        = errors.New("backend request failed")
 )
 
-// InterfaceRepository adalah port keluar (outbound) menuju backend.
-// Hanya implementasi di file ini yang boleh mengetahui detail HTTP,
-// base URL, dan header X-App-Key.
 type InterfaceRepository interface {
 	Create(ctx context.Context, data CreateData) (*User, error)
 	List(ctx context.Context, params ListParams) (*ListResult, error)
@@ -32,43 +28,20 @@ type InterfaceRepository interface {
 	Delete(ctx context.Context, id string) error
 }
 
-// RepositoryConfig memuat seluruh opsi koneksi keluar menuju backend.
-// Dikumpulkan dalam satu struct agar penambahan opsi tidak mengubah tanda
-// tangan konstruktor dan pemanggilan tetap mudah dibaca.
 type RepositoryConfig struct {
-	// BaseURL adalah alamat dasar backend, mis. http://127.0.0.1:10001.
-	BaseURL string
-	// AppKey dikirim sebagai header X-App-Key. Bila kosong, header TIDAK
-	// dikirim sama sekali (agar salah konfigurasi mudah terdeteksi di backend).
-	AppKey string
-	// Timeout adalah batas total per request (detik). <= 0 berarti tanpa batas.
-	Timeout int
-	// MaxResponseBytes membatasi ukuran body response yang dibaca ke memori.
-	// Ini proteksi utama terhadap out-of-memory bila backend mengirim body
-	// sangat besar. <= 0 berarti tidak dibatasi (tidak disarankan).
+	BaseURL          string
+	AppKey           string
+	Timeout          int
 	MaxResponseBytes int
-	// MaxIdleConns membatasi jumlah koneksi idle yang di-pool lintas host.
-	MaxIdleConns int
-	// MaxConnsPerHost membatasi total koneksi (aktif + idle) per host untuk
-	// mencegah ledakan goroutine/koneksi saat backend lambat.
-	MaxConnsPerHost int
-	// RetryCount adalah jumlah percobaan ulang untuk kegagalan transient.
-	RetryCount int
+	MaxIdleConns     int
+	MaxConnsPerHost  int
+	RetryCount       int
 }
 
-// Repository adalah adapter keluar berbasis resty menuju backend GoAPI.
 type Repository struct {
 	client *resty.Client
 }
 
-// NewRepository membangun repository yang di-harden untuk pemakaian jangka
-// panjang: timeout granular pada transport, batas ukuran body (anti-OOM),
-// batas connection pool, dan retry transient. Seluruh koneksi keluar
-// workspace terpusat di sini.
-//
-// Catatan resource: resty membaca lalu MENUTUP response body secara internal
-// (defer close), sehingga pemanggil tidak perlu menutup body manual dan tidak
-// ada koneksi yang menggantung selama transport dikonfigurasi dengan timeout.
 func NewRepository(cfg RepositoryConfig) *Repository {
 	timeout := time.Duration(cfg.Timeout) * time.Second
 
@@ -99,15 +72,10 @@ func NewRepository(cfg RepositoryConfig) *Repository {
 		SetRetryWaitTime(200 * time.Millisecond).
 		SetRetryMaxWaitTime(2 * time.Second)
 
-	// Header X-App-Key hanya dikirim bila terkonfigurasi. Mengirim header
-	// kosong hanya membuat backend menolak dengan pesan yang membingungkan.
 	if cfg.AppKey != "" {
 		client.SetHeader("X-App-Key", cfg.AppKey)
 	}
 
-	// Teruskan request ID (dari context) ke backend untuk korelasi log
-	// lintas layanan. Dipasang sekali di sini agar seluruh method tidak perlu
-	// menyetel header secara manual.
 	client.OnBeforeRequest(func(_ *resty.Client, req *resty.Request) error {
 		if requestID := entity.RequestIDFromContext(req.Context()); requestID != "" {
 			req.SetHeader(entity.RequestIDHeader, requestID)
@@ -254,8 +222,6 @@ func (r *Repository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-// buildListQuery hanya menyertakan query param yang terisi agar backend
-// memakai nilai default efektifnya (page=1, limit=10).
 func buildListQuery(params ListParams) map[string]string {
 	query := make(map[string]string)
 
@@ -276,7 +242,6 @@ func buildListQuery(params ListParams) map[string]string {
 	return query
 }
 
-// mapStatusError menerjemahkan status HTTP backend menjadi error domain.
 func mapStatusError(statusCode int) error {
 	switch {
 	case statusCode >= http.StatusOK && statusCode < http.StatusMultipleChoices:

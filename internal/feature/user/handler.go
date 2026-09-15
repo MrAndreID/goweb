@@ -7,20 +7,15 @@ import (
 	"strings"
 
 	"github.com/MrAndreID/goweb/internal/entity"
+
 	"github.com/labstack/echo/v5"
 	"github.com/sirupsen/logrus"
 )
 
-// handler adalah adapter masuk berbasis Echo v5. Hanya lapisan ini yang
-// mengetahui detail framework (routing, form parsing, rendering HTML).
 type handler struct {
 	service InterfaceService
 }
 
-// NewHandler mendaftarkan seluruh route SSR feature user.
-//
-// Form HTML hanya mendukung GET dan POST, sehingga update dan delete
-// diekspos sebagai POST ke sub-path (bukan PATCH/DELETE).
 func NewHandler(g *echo.Group, service InterfaceService) *handler {
 	h := &handler{service: service}
 
@@ -34,7 +29,6 @@ func NewHandler(g *echo.Group, service InterfaceService) *handler {
 	return h
 }
 
-// pageData adalah bentuk data seragam yang dikirim ke template.
 type pageData struct {
 	Title     string
 	Users     []User
@@ -51,9 +45,6 @@ type formValues struct {
 	Emails string
 }
 
-// requestContext mengambil request ID yang dipasang middleware Echo lalu
-// menautkannya ke context request, sehingga lapisan repository bisa
-// meneruskannya ke backend untuk korelasi log tanpa mengenal Echo.
 func requestContext(c *echo.Context) context.Context {
 	ctx := c.Request().Context()
 
@@ -215,8 +206,6 @@ func (h *handler) Delete(c *echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, "/users?success=user+deleted")
 }
 
-// parseEmails memecah input textarea/field (dipisah baris baru atau koma)
-// menjadi daftar email.
 func parseEmails(raw string) []string {
 	fields := strings.FieldsFunc(raw, func(r rune) bool {
 		return r == '\n' || r == '\r' || r == ',' || r == ';'
@@ -235,7 +224,6 @@ func parseEmails(raw string) []string {
 	return emails
 }
 
-// joinEmails mengubah daftar Email menjadi teks satu email per baris untuk form.
 func joinEmails(emails []Email) string {
 	values := make([]string, 0, len(emails))
 
@@ -246,7 +234,6 @@ func joinEmails(emails []Email) string {
 	return strings.Join(values, "\n")
 }
 
-// humanizeError memetakan error domain/proses ke pesan yang ramah pengguna.
 func humanizeError(err error) string {
 	switch {
 	case errors.Is(err, ErrNameRequired):

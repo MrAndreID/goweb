@@ -38,11 +38,8 @@ func newServer(cfg *config.Config) (*echo.Echo, error) {
 
 	e.Renderer = renderer
 
-	// Error dirender sebagai HALAMAN HTML ber-layout (SSR), bukan JSON.
 	e.HTTPErrorHandler = renderer.HTTPErrorHandler
 
-	// Aset statis (CSS) dilayani dari embedded FS di /static agar CSP tetap
-	// ketat (tanpa inline style).
 	e.StaticFS("/static", view.StaticFS())
 
 	e.Pre(middleware.RemoveTrailingSlash())

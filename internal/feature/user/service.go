@@ -4,27 +4,23 @@ import (
 	"context"
 	"errors"
 	"strings"
-	"uuid"
+
+	"github.com/google/uuid"
 )
 
-// Kesalahan validasi tingkat proses bisnis (sebelum menyentuh backend).
 var (
 	ErrNameRequired  = errors.New("name is required")
 	ErrEmailRequired = errors.New("at least one email is required")
 )
 
-// Service memuat proses bisnis feature user. Lapisan ini tidak mengetahui
-// detail HTTP maupun framework; ia hanya berbicara ke port InterfaceRepository.
 type Service struct {
 	repository InterfaceRepository
 }
 
-// NewService membangun service dengan dependensi repository.
 func NewService(repository InterfaceRepository) *Service {
 	return &Service{repository: repository}
 }
 
-// InterfaceService adalah port masuk (inbound) yang dipakai handler.
 type InterfaceService interface {
 	Create(ctx context.Context, data CreateData) (*User, error)
 	List(ctx context.Context, params ListParams) (*ListResult, error)
@@ -32,7 +28,6 @@ type InterfaceService interface {
 	Delete(ctx context.Context, id string) error
 }
 
-// Create memvalidasi input lalu meminta repository membuat user di backend.
 func (s *Service) Create(ctx context.Context, data CreateData) (*User, error) {
 	data.Name = strings.TrimSpace(data.Name)
 	data.Emails = sanitizeEmails(data.Emails)
@@ -48,9 +43,6 @@ func (s *Service) Create(ctx context.Context, data CreateData) (*User, error) {
 	return s.repository.Create(ctx, data)
 }
 
-// List meneruskan filter/pagination ke backend. Bila filter ID diisi, ID wajib
-// berupa UUID yang valid agar tidak melakukan round-trip untuk id yang jelas
-// salah.
 func (s *Service) List(ctx context.Context, params ListParams) (*ListResult, error) {
 	if params.ID != "" && !isValidID(params.ID) {
 		return nil, ErrNotFound
@@ -59,7 +51,6 @@ func (s *Service) List(ctx context.Context, params ListParams) (*ListResult, err
 	return s.repository.List(ctx, params)
 }
 
-// Update memvalidasi input parsial lalu meminta repository memperbaruinya.
 func (s *Service) Update(ctx context.Context, id string, data UpdateData) error {
 	if !isValidID(id) {
 		return ErrNotFound
@@ -77,7 +68,6 @@ func (s *Service) Update(ctx context.Context, id string, data UpdateData) error 
 	return s.repository.Update(ctx, id, data)
 }
 
-// Delete meminta repository menghapus user (soft delete di backend).
 func (s *Service) Delete(ctx context.Context, id string) error {
 	if !isValidID(id) {
 		return ErrNotFound
@@ -86,7 +76,6 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 	return s.repository.Delete(ctx, id)
 }
 
-// isValidID memastikan id tidak kosong dan berformat UUID sesuai kontrak backend.
 func isValidID(id string) bool {
 	id = strings.TrimSpace(id)
 
@@ -99,7 +88,6 @@ func isValidID(id string) bool {
 	return err == nil
 }
 
-// sanitizeEmails membuang spasi dan elemen kosong dari daftar email.
 func sanitizeEmails(emails []string) []string {
 	cleaned := make([]string, 0, len(emails))
 

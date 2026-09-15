@@ -1,10 +1,3 @@
-// Package view menyediakan layout global dan renderer SSR untuk seluruh
-// feature. Layout hidup di lapisan application (global), sedangkan setiap
-// feature hanya menyumbang blok "content" (dan opsional "title").
-//
-// Renderer meng-compose layout global + content tiap halaman menjadi satu
-// template tree per halaman pada saat startup, sehingga tidak ada parsing
-// saat request dan template yang rusak langsung ketahuan ketika boot.
 package view
 
 import (
@@ -30,40 +23,22 @@ var pageFS embed.FS
 //go:embed static/*
 var staticFS embed.FS
 
-// StaticFS mengembalikan filesystem berisi aset statis (CSS, dll.) yang
-// di-root pada folder "static", siap dilayani lewat echo.StaticFS.
 func StaticFS() fs.FS {
 	return echo.MustSubFS(staticFS, "static")
 }
 
-// layoutName adalah nama template terluar yang dieksekusi untuk setiap halaman.
 const layoutName = "base"
 
-// ErrorPage adalah nama halaman generik lintas-feature untuk menampilkan error
-// (404, 405, 500, dll.) sebagai HTML ber-layout.
 const ErrorPage = "error"
 
-// contentGlob adalah pola file content di dalam FS milik feature.
 const contentGlob = "templates/*.html"
 
-// globalPageGlob adalah pola halaman generik milik lapisan application (view).
 const globalPageGlob = "pages/*.html"
 
-// Renderer mengimplementasikan echo.Renderer. Ia memetakan nama halaman
-// (mis. "users_index") ke tree yang sudah tergabung dengan layout global.
 type Renderer struct {
 	pages map[string]*template.Template
 }
 
-// NewRenderer membangun renderer dari kumpulan FS content milik feature.
-//
-// Setiap file content mendefinisikan halaman lewat:
-//
-//	{{ define "content" }} ... {{ end }}
-//	{{ define "title" }} ... {{ end }}   (opsional)
-//
-// dan didaftarkan dengan nama = base name file tanpa ekstensi
-// (mis. templates/users_index.html -> "users_index").
 func NewRenderer(featureViews ...embed.FS) (*Renderer, error) {
 	base, err := template.New(layoutName).ParseFS(layoutFS, "layouts/*.html")
 
@@ -73,12 +48,10 @@ func NewRenderer(featureViews ...embed.FS) (*Renderer, error) {
 
 	renderer := &Renderer{pages: make(map[string]*template.Template)}
 
-	// Halaman generik milik lapisan application (mis. "error").
 	if err := renderer.register(base, pageFS, globalPageGlob); err != nil {
 		return nil, err
 	}
 
-	// Content milik tiap feature.
 	for _, fsys := range featureViews {
 		if err := renderer.register(base, fsys, contentGlob); err != nil {
 			return nil, err
@@ -88,8 +61,6 @@ func NewRenderer(featureViews ...embed.FS) (*Renderer, error) {
 	return renderer, nil
 }
 
-// register memindai file content pada fsys sesuai glob, meng-clone layout
-// global untuk tiap halaman, lalu memetakannya dengan nama = base name file.
 func (r *Renderer) register(base *template.Template, fsys fs.FS, glob string) error {
 	entries, err := fs.Glob(fsys, glob)
 
@@ -100,8 +71,6 @@ func (r *Renderer) register(base *template.Template, fsys fs.FS, glob string) er
 	for _, entry := range entries {
 		name := strings.TrimSuffix(filepath.Base(entry), filepath.Ext(entry))
 
-		// Nama halaman harus unik lintas feature dan halaman global. Tabrakan
-		// dibuat gagal saat startup, bukan menimpa diam-diam.
 		if _, exists := r.pages[name]; exists {
 			return fmt.Errorf("view: duplicate page name %q (template %q clashes with an already registered page)", name, entry)
 		}
@@ -128,7 +97,6 @@ func (r *Renderer) register(base *template.Template, fsys fs.FS, glob string) er
 	return nil
 }
 
-// Render mengeksekusi layout global untuk halaman bernama name.
 func (r *Renderer) Render(c *echo.Context, w io.Writer, name string, data any) error {
 	page, ok := r.pages[name]
 
@@ -139,20 +107,12 @@ func (r *Renderer) Render(c *echo.Context, w io.Writer, name string, data any) e
 	return page.ExecuteTemplate(w, layoutName, data)
 }
 
-// errorPageData adalah data yang dikirim ke halaman error.
 type errorPageData struct {
 	Title   string
 	Code    int
 	Message string
 }
 
-// HTTPErrorHandler adalah echo.HTTPErrorHandler yang merender error sebagai
-// HALAMAN HTML ber-layout (bukan JSON), sesuai sifat aplikasi SSR.
-//
-// Alur: abaikan bila response sudah ter-commit; tentukan status via
-// echo.StatusCode (fallback 500); render halaman "error"; bila render gagal
-// (mis. HEAD request atau template bermasalah), sediakan fallback teks agar
-// klien tetap menerima respons dengan status yang benar.
 func (r *Renderer) HTTPErrorHandler(c *echo.Context, err error) {
 	var tag string = "internal.application.view.HTTPErrorHandler."
 
@@ -174,7 +134,6 @@ func (r *Renderer) HTTPErrorHandler(c *echo.Context, err error) {
 		"error":      err.Error(),
 	}).Error("request failed")
 
-	// HEAD tidak boleh punya body.
 	if c.Request().Method == http.MethodHead {
 		if nErr := c.NoContent(code); nErr != nil {
 			logrus.WithFields(logrus.Fields{
@@ -196,7 +155,6 @@ func (r *Renderer) HTTPErrorHandler(c *echo.Context, err error) {
 		return
 	}
 
-	// Fallback: bila render halaman error gagal, tetap kirim respons teks.
 	logrus.WithFields(logrus.Fields{
 		"tag":   tag + "03",
 		"error": renderErr.Error(),

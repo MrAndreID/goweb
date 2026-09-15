@@ -37,14 +37,7 @@ To use The `MrAndreID/GoWeb`, you must follow the steps below:
 ```sh
 # cp .env.example .env
 ```
-- Configuring .env file, including the Backend connection:
-  - `BACKEND_BASE_URL` - base URL of the Backend API (default `http://127.0.0.1:10001`)
-  - `BACKEND_APP_KEY` - sent as the `X-App-Key` header; leave empty to omit the header
-  - `BACKEND_TIMEOUT` - total request timeout in seconds (default `10`)
-  - `BACKEND_MAX_RESPONSE_BYTES` - max response body size in bytes read into memory (default `2097152`)
-  - `BACKEND_MAX_IDLE_CONNS` - max idle connections in the pool (default `100`)
-  - `BACKEND_MAX_CONNS_PER_HOST` - max connections per host (default `100`)
-  - `BACKEND_RETRY_COUNT` - retry attempts for transient failures (default `2`)
+- Configuring .env file
 
 ## Unit Test
 
