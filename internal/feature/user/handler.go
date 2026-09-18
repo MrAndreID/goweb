@@ -31,6 +31,7 @@ func NewHandler(g *echo.Group, service InterfaceService) *handler {
 
 type pageData struct {
 	Title     string
+	CSRFToken string
 	Users     []User
 	User      *User
 	Paginator Paginator
@@ -55,6 +56,12 @@ func requestContext(c *echo.Context) context.Context {
 	return ctx
 }
 
+func csrfToken(c *echo.Context) string {
+	token, _ := c.Get("csrf").(string)
+
+	return token
+}
+
 func (h *handler) Index(c *echo.Context) error {
 	var tag string = "internal.feature.user.handler.Index."
 
@@ -77,13 +84,15 @@ func (h *handler) Index(c *echo.Context) error {
 		}).Error("failed to list users")
 
 		return c.Render(http.StatusOK, "users_index", pageData{
-			Title: "Users",
-			Error: humanizeError(err),
+			Title:     "Users",
+			CSRFToken: csrfToken(c),
+			Error:     humanizeError(err),
 		})
 	}
 
 	return c.Render(http.StatusOK, "users_index", pageData{
 		Title:     "Users",
+		CSRFToken: csrfToken(c),
 		Users:     result.Users,
 		Paginator: result.Paginator,
 		Success:   c.QueryParam("success"),
@@ -92,7 +101,8 @@ func (h *handler) Index(c *echo.Context) error {
 
 func (h *handler) CreateForm(c *echo.Context) error {
 	return c.Render(http.StatusOK, "users_form", pageData{
-		Title: "Create User",
+		Title:     "Create User",
+		CSRFToken: csrfToken(c),
 	})
 }
 
@@ -116,9 +126,10 @@ func (h *handler) Create(c *echo.Context) error {
 		}).Error("failed to create user")
 
 		return c.Render(http.StatusOK, "users_form", pageData{
-			Title: "Create User",
-			Form:  form,
-			Error: humanizeError(err),
+			Title:     "Create User",
+			CSRFToken: csrfToken(c),
+			Form:      form,
+			Error:     humanizeError(err),
 		})
 	}
 
@@ -141,17 +152,19 @@ func (h *handler) EditForm(c *echo.Context) error {
 		}
 
 		return c.Render(http.StatusOK, "users_form", pageData{
-			Title: "Edit User",
-			Error: "user not found",
-			Form:  formValues{ID: id},
+			Title:     "Edit User",
+			CSRFToken: csrfToken(c),
+			Error:     "user not found",
+			Form:      formValues{ID: id},
 		})
 	}
 
 	current := result.Users[0]
 
 	return c.Render(http.StatusOK, "users_form", pageData{
-		Title: "Edit User",
-		User:  &current,
+		Title:     "Edit User",
+		CSRFToken: csrfToken(c),
+		User:      &current,
 		Form: formValues{
 			ID:     current.ID,
 			Name:   current.Name,
@@ -176,7 +189,8 @@ func (h *handler) Update(c *echo.Context) error {
 		}).Error("failed to update user")
 
 		return c.Render(http.StatusOK, "users_form", pageData{
-			Title: "Edit User",
+			Title:     "Edit User",
+			CSRFToken: csrfToken(c),
 			Form: formValues{
 				ID:     id,
 				Name:   name,

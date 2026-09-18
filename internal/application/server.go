@@ -91,6 +91,13 @@ func newServer(cfg *config.Config) (*echo.Echo, error) {
 
 	e.Use(middleware.SecureWithConfig(secureMiddleware))
 	e.Use(middleware.RequestLogger())
+	e.Use(middleware.CSRFWithConfig(middleware.CSRFConfig{
+		TokenLookup:    "form:_csrf,header:X-CSRF-Token",
+		CookieName:     "csrf",
+		CookiePath:     "/",
+		CookieHTTPOnly: true,
+		CookieSameSite: http.SameSiteLaxMode,
+	}))
 
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins: cfg.AllowedOrigins,
