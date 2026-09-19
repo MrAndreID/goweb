@@ -61,6 +61,19 @@ func TestServiceCreate(t *testing.T) {
 		assert.ErrorIs(t, err, user.ErrEmailRequired)
 	})
 
+	t.Run("returns ErrEmailInvalid when an email has invalid format", func(t *testing.T) {
+		repo := &mockRepository{}
+		service := newServiceWithMock(repo)
+
+		result, err := service.Create(context.Background(), user.CreateData{
+			Name:   "Andre",
+			Emails: []string{"not-an-email"},
+		})
+
+		assert.Nil(t, result)
+		assert.ErrorIs(t, err, user.ErrEmailInvalid)
+	})
+
 	t.Run("propagates repository error", func(t *testing.T) {
 		sentinel := errors.New("boom")
 		repo := &mockRepository{
@@ -167,6 +180,34 @@ func TestServiceUpdate(t *testing.T) {
 		require.NoError(t, err)
 		assert.Nil(t, repo.lastUpdate.Name)
 		assert.Nil(t, repo.lastUpdate.Emails)
+	})
+
+	t.Run("returns ErrNameRequired when provided name is empty", func(t *testing.T) {
+		name := "   "
+		repo := &mockRepository{}
+		service := newServiceWithMock(repo)
+
+		err := service.Update(context.Background(), validUserID, user.UpdateData{Name: &name})
+
+		assert.ErrorIs(t, err, user.ErrNameRequired)
+	})
+
+	t.Run("returns ErrEmailRequired when provided emails are empty", func(t *testing.T) {
+		repo := &mockRepository{}
+		service := newServiceWithMock(repo)
+
+		err := service.Update(context.Background(), validUserID, user.UpdateData{Emails: []string{" ", ""}})
+
+		assert.ErrorIs(t, err, user.ErrEmailRequired)
+	})
+
+	t.Run("returns ErrEmailInvalid when provided email has invalid format", func(t *testing.T) {
+		repo := &mockRepository{}
+		service := newServiceWithMock(repo)
+
+		err := service.Update(context.Background(), validUserID, user.UpdateData{Emails: []string{"not-an-email"}})
+
+		assert.ErrorIs(t, err, user.ErrEmailInvalid)
 	})
 }
 

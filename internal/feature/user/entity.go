@@ -27,7 +27,7 @@ type CreateData struct {
 
 type UpdateData struct {
 	Name   *string  `json:"name,omitempty"`
-	Emails []string `json:"emails,omitempty"`
+	Emails []string `json:"emails"`
 }
 
 type ListParams struct {

@@ -83,7 +83,7 @@ func (h *handler) Index(c *echo.Context) error {
 			"error": err.Error(),
 		}).Error("failed to list users")
 
-		return c.Render(http.StatusOK, "users_index", pageData{
+		return c.Render(errorStatus(err), "users_index", pageData{
 			Title:     "Users",
 			CSRFToken: csrfToken(c),
 			Error:     humanizeError(err),
@@ -125,7 +125,7 @@ func (h *handler) Create(c *echo.Context) error {
 			"error": err.Error(),
 		}).Error("failed to create user")
 
-		return c.Render(http.StatusOK, "users_form", pageData{
+		return c.Render(errorStatus(err), "users_form", pageData{
 			Title:     "Create User",
 			CSRFToken: csrfToken(c),
 			Form:      form,
@@ -144,17 +144,22 @@ func (h *handler) EditForm(c *echo.Context) error {
 	result, err := h.service.List(requestContext(c), ListParams{ID: id})
 
 	if err != nil || len(result.Users) == 0 {
+		status := http.StatusNotFound
+		message := "user not found"
+
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
 				"tag":   tag + "01",
 				"error": err.Error(),
 			}).Error("failed to load user for edit")
+			status = errorStatus(err)
+			message = humanizeError(err)
 		}
 
-		return c.Render(http.StatusOK, "users_form", pageData{
+		return c.Render(status, "users_form", pageData{
 			Title:     "Edit User",
 			CSRFToken: csrfToken(c),
-			Error:     "user not found",
+			Error:     message,
 			Form:      formValues{ID: id},
 		})
 	}
@@ -188,7 +193,7 @@ func (h *handler) Update(c *echo.Context) error {
 			"error": err.Error(),
 		}).Error("failed to update user")
 
-		return c.Render(http.StatusOK, "users_form", pageData{
+		return c.Render(errorStatus(err), "users_form", pageData{
 			Title:     "Edit User",
 			CSRFToken: csrfToken(c),
 			Form: formValues{
@@ -214,7 +219,11 @@ func (h *handler) Delete(c *echo.Context) error {
 			"error": err.Error(),
 		}).Error("failed to delete user")
 
-		return c.Redirect(http.StatusSeeOther, "/users?success=failed+to+delete+user")
+		return c.Render(errorStatus(err), "users_index", pageData{
+			Title:     "Users",
+			CSRFToken: csrfToken(c),
+			Error:     humanizeError(err),
+		})
 	}
 
 	return c.Redirect(http.StatusSeeOther, "/users?success=user+deleted")
@@ -254,6 +263,8 @@ func humanizeError(err error) string {
 		return "name is required"
 	case errors.Is(err, ErrEmailRequired):
 		return "at least one valid email is required"
+	case errors.Is(err, ErrEmailInvalid):
+		return "one or more email addresses are invalid"
 	case errors.Is(err, ErrValidation):
 		return "the data sent is invalid"
 	case errors.Is(err, ErrDuplicateEmail):
@@ -264,5 +275,18 @@ func humanizeError(err error) string {
 		return "the application key was rejected by the backend"
 	default:
 		return "failed to reach the backend, please try again"
+	}
+}
+
+func errorStatus(err error) int {
+	switch {
+	case errors.Is(err, ErrNotFound):
+		return http.StatusNotFound
+	case errors.Is(err, ErrNameRequired), errors.Is(err, ErrEmailRequired), errors.Is(err, ErrEmailInvalid), errors.Is(err, ErrValidation):
+		return http.StatusUnprocessableEntity
+	case errors.Is(err, ErrDuplicateEmail):
+		return http.StatusConflict
+	default:
+		return http.StatusBadGateway
 	}
 }

@@ -65,7 +65,7 @@ func TestHandlerIndex(t *testing.T) {
 		e := newTestServer(t, newServiceWithMock(repo))
 		rec := doRequest(e, httptest.NewRequest(http.MethodGet, "/users", nil))
 
-		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, http.StatusBadGateway, rec.Code)
 		assert.Contains(t, rec.Body.String(), "failed to reach the backend")
 	})
 }
@@ -109,7 +109,7 @@ func TestHandlerCreate(t *testing.T) {
 
 		rec := doRequest(e, postForm("/users", form))
 
-		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, http.StatusConflict, rec.Code)
 		assert.Contains(t, rec.Body.String(), "already used")
 	})
 }
@@ -133,6 +133,12 @@ func TestHandlerCreateHumanizedErrors(t *testing.T) {
 			formName:   "Andre",
 			formEmails: "   ",
 			wantText:   "at least one valid email is required",
+		},
+		{
+			name:       "invalid email format (service validation)",
+			formName:   "Andre",
+			formEmails: "not-an-email",
+			wantText:   "one or more email addresses are invalid",
 		},
 		{
 			name:       "validation error from backend",
@@ -175,7 +181,11 @@ func TestHandlerCreateHumanizedErrors(t *testing.T) {
 
 			rec := doRequest(e, postForm("/users", form))
 
-			assert.Equal(t, http.StatusOK, rec.Code)
+			if tc.repoErr == nil {
+				assert.Equal(t, http.StatusUnprocessableEntity, rec.Code)
+			} else {
+				assert.Equal(t, expectedErrorStatus(tc.repoErr), rec.Code)
+			}
 			assert.Contains(t, rec.Body.String(), tc.wantText)
 		})
 	}
@@ -214,7 +224,7 @@ func TestHandlerEditForm(t *testing.T) {
 		e := newTestServer(t, newServiceWithMock(repo))
 		rec := doRequest(e, httptest.NewRequest(http.MethodGet, "/users/3f2504e0-4f89-41d3-9a0c-0305e82c3301/edit", nil))
 
-		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, http.StatusNotFound, rec.Code)
 		assert.Contains(t, rec.Body.String(), "user not found")
 	})
 
@@ -228,8 +238,8 @@ func TestHandlerEditForm(t *testing.T) {
 		e := newTestServer(t, newServiceWithMock(repo))
 		rec := doRequest(e, httptest.NewRequest(http.MethodGet, "/users/3f2504e0-4f89-41d3-9a0c-0305e82c3301/edit", nil))
 
-		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.Contains(t, rec.Body.String(), "user not found")
+		assert.Equal(t, http.StatusBadGateway, rec.Code)
+		assert.Contains(t, rec.Body.String(), "failed to reach the backend")
 	})
 }
 
@@ -263,8 +273,36 @@ func TestHandlerUpdate(t *testing.T) {
 
 		rec := doRequest(e, postForm("/users/3f2504e0-4f89-41d3-9a0c-0305e82c3301", form))
 
-		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, http.StatusUnprocessableEntity, rec.Code)
 		assert.Contains(t, rec.Body.String(), "the data sent is invalid")
+	})
+
+	t.Run("rejects empty name", func(t *testing.T) {
+		repo := &mockRepository{}
+		e := newTestServer(t, newServiceWithMock(repo))
+
+		form := url.Values{}
+		form.Set("name", "   ")
+		form.Set("emails", "a@x.com")
+
+		rec := doRequest(e, postForm("/users/3f2504e0-4f89-41d3-9a0c-0305e82c3301", form))
+
+		assert.Equal(t, http.StatusUnprocessableEntity, rec.Code)
+		assert.Contains(t, rec.Body.String(), "name is required")
+	})
+
+	t.Run("rejects empty emails", func(t *testing.T) {
+		repo := &mockRepository{}
+		e := newTestServer(t, newServiceWithMock(repo))
+
+		form := url.Values{}
+		form.Set("name", "New Name")
+		form.Set("emails", "   ")
+
+		rec := doRequest(e, postForm("/users/3f2504e0-4f89-41d3-9a0c-0305e82c3301", form))
+
+		assert.Equal(t, http.StatusUnprocessableEntity, rec.Code)
+		assert.Contains(t, rec.Body.String(), "at least one valid email is required")
 	})
 }
 
@@ -291,7 +329,20 @@ func TestHandlerDelete(t *testing.T) {
 
 		rec := doRequest(e, postForm("/users/3f2504e0-4f89-41d3-9a0c-0305e82c3301/delete", url.Values{}))
 
-		assert.Equal(t, http.StatusSeeOther, rec.Code)
-		assert.Equal(t, "/users?success=failed+to+delete+user", rec.Header().Get("Location"))
+		assert.Equal(t, http.StatusBadGateway, rec.Code)
+		assert.Contains(t, rec.Body.String(), "failed to reach the backend")
 	})
+}
+
+func expectedErrorStatus(err error) int {
+	switch err {
+	case user.ErrValidation:
+		return http.StatusUnprocessableEntity
+	case user.ErrNotFound:
+		return http.StatusNotFound
+	case user.ErrUnauthorized:
+		return http.StatusBadGateway
+	default:
+		return http.StatusBadGateway
+	}
 }

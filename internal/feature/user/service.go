@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"errors"
+	"net/mail"
 	"strings"
 
 	"github.com/google/uuid"
@@ -11,6 +12,7 @@ import (
 var (
 	ErrNameRequired  = errors.New("name is required")
 	ErrEmailRequired = errors.New("at least one email is required")
+	ErrEmailInvalid  = errors.New("email is invalid")
 )
 
 type Service struct {
@@ -40,6 +42,10 @@ func (s *Service) Create(ctx context.Context, data CreateData) (*User, error) {
 		return nil, ErrEmailRequired
 	}
 
+	if !validEmails(data.Emails) {
+		return nil, ErrEmailInvalid
+	}
+
 	return s.repository.Create(ctx, data)
 }
 
@@ -58,11 +64,24 @@ func (s *Service) Update(ctx context.Context, id string, data UpdateData) error 
 
 	if data.Name != nil {
 		name := strings.TrimSpace(*data.Name)
+
+		if name == "" {
+			return ErrNameRequired
+		}
+
 		data.Name = &name
 	}
 
 	if data.Emails != nil {
 		data.Emails = sanitizeEmails(data.Emails)
+
+		if len(data.Emails) == 0 {
+			return ErrEmailRequired
+		}
+
+		if !validEmails(data.Emails) {
+			return ErrEmailInvalid
+		}
 	}
 
 	return s.repository.Update(ctx, id, data)
@@ -100,4 +119,16 @@ func sanitizeEmails(emails []string) []string {
 	}
 
 	return cleaned
+}
+
+func validEmails(emails []string) bool {
+	for _, email := range emails {
+		parsed, err := mail.ParseAddress(email)
+
+		if err != nil || parsed.Address != email {
+			return false
+		}
+	}
+
+	return true
 }
