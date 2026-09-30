@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/MrAndreID/goweb/internal/application/config"
-	"github.com/MrAndreID/goweb/internal/application/view"
-	"github.com/MrAndreID/goweb/internal/feature/user"
 
 	"github.com/MrAndreID/gomiddleware/v2"
 	"github.com/MrAndreID/gopackage/v2"
@@ -18,29 +16,10 @@ import (
 )
 
 func newServer(cfg *config.Config) (*echo.Echo, error) {
-	var tag string = "internal.application.server.newServer."
-
 	e := echo.New()
 
 	e.Validator = gopackage.CustomValidator()
 	e.JSONSerializer = gopackage.CustomJSONSerializer()
-
-	renderer, err := view.NewRenderer(user.Views)
-
-	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"tag":   tag + "01",
-			"error": err.Error(),
-		}).Error("failed to build html renderer")
-
-		return nil, err
-	}
-
-	e.Renderer = renderer
-
-	e.HTTPErrorHandler = renderer.HTTPErrorHandler
-
-	e.StaticFS("/static", view.StaticFS())
 
 	e.Pre(middleware.RemoveTrailingSlash())
 	e.Pre(gomiddleware.EchoSetRequestID)

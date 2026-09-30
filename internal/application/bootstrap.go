@@ -65,6 +65,17 @@ func Start() error {
 		return err
 	}
 
+	err = RegisterViews(e)
+
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"tag":   tag + "03",
+			"error": err.Error(),
+		}).Error("failed to register views")
+
+		return err
+	}
+
 	RegisterRoutes(e)
 
 	return run(e, cfg)
