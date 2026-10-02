@@ -2,6 +2,7 @@ package view
 
 import (
 	"embed"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -113,6 +114,33 @@ type errorPageData struct {
 	Message string
 }
 
+var echoCustomHTTPErrors = map[string]struct {
+	code    int
+	title   string
+	message string
+}{
+	"MAINTENANCE": {
+		code:    http.StatusServiceUnavailable,
+		title:   "Maintenance",
+		message: "Layanan sedang dalam pemeliharaan. Silakan coba kembali nanti.",
+	},
+	"REQUEST_TIMEOUT": {
+		code:    http.StatusRequestTimeout,
+		title:   "Request Timeout",
+		message: "Permintaan membutuhkan waktu terlalu lama. Silakan coba kembali.",
+	},
+	"FORBIDDEN": {
+		code:    http.StatusForbidden,
+		title:   "Forbidden",
+		message: "Anda tidak memiliki izin untuk mengakses halaman ini.",
+	},
+	"TOO_MANY_REQUESTS": {
+		code:    http.StatusTooManyRequests,
+		title:   "Too Many Requests",
+		message: "Terlalu banyak permintaan. Silakan tunggu sebelum mencoba kembali.",
+	},
+}
+
 func (r *Renderer) HTTPErrorHandler(c *echo.Context, err error) {
 	var tag string = "internal.application.view.HTTPErrorHandler."
 
@@ -120,18 +148,30 @@ func (r *Renderer) HTTPErrorHandler(c *echo.Context, err error) {
 		return
 	}
 
-	code := http.StatusInternalServerError
+	var (
+		statusCoder echo.HTTPStatusCoder
+		code        int = http.StatusInternalServerError
+	)
 
-	if status := echo.StatusCode(err); status != 0 {
-		code = status
+	if errors.As(err, &statusCoder) {
+		if status := statusCoder.StatusCode(); status != 0 {
+			code = status
+		}
 	}
 
 	message := http.StatusText(code)
+	title := message
+
+	if custom, ok := echoCustomHTTPErrors[err.Error()]; ok {
+		code = custom.code
+		title = custom.title
+		message = custom.message
+	}
 
 	logrus.WithFields(logrus.Fields{
-		"tag":        tag + "01",
-		"statusCode": code,
-		"error":      err.Error(),
+		"tag":     tag + "01",
+		"code":    code,
+		"message": message,
 	}).Error("request failed")
 
 	if c.Request().Method == http.MethodHead {
@@ -146,7 +186,7 @@ func (r *Renderer) HTTPErrorHandler(c *echo.Context, err error) {
 	}
 
 	renderErr := c.Render(code, ErrorPage, errorPageData{
-		Title:   message,
+		Title:   title,
 		Code:    code,
 		Message: message,
 	})
